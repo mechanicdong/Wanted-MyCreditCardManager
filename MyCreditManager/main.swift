@@ -24,74 +24,53 @@ final class MyCreditManager {
                 return
             }
             
-            if validateInput(type.rawValue) {
-                switch type {
-                case .addStudent:
-                    studentManager.addStudent()
-                case .removeStudent:
-                    studentManager.removeStudent()
-                case .addGrade:
-                    studentManager.addGrade()
-                case .removeGrade:
-                    studentManager.removeGrade()
-                case .getAllGrade:
-                    studentManager.getAverageGrade()
-                case .exit:
-                    print("프로그램을 종료합니다...")
-                    break
+            do {
+                if try validateInput(type.rawValue) {
+                    switch type {
+                    case .addStudent:
+                        print("추가할 학생의 이름을 입력해주세요")
+                        let studentName = readStudentName()
+                        studentManager.addStudent(studentName)
+                    case .removeStudent:
+                        print("삭제할 학생의 이름을 입력해주세요")
+                        let studentName = readStudentName()
+                        studentManager.removeStudent(studentName)
+                    case .addGrade:
+                        print("성적을 추가할 학생의 이름, 과목 이름, 성적(A+, A, F 등)을 띄어쓰기로 구분하여 차례로 작성해주세요.")
+                        let studentInfos = readStudentInfos(3)
+                        studentManager.addGrade(studentInfos)
+                    case .removeGrade:
+                        print("성적을 삭제할 학생의 이름, 과목 이름을 띄어쓰기로 구분하여 차례로 작성해주세요.")
+                        let studentInfos = readStudentInfos(2)
+                        studentManager.removeGrade(studentInfos)
+                    case .getAllGrade:
+                        print("평점을 알고싶은 학생의 이름을 입력해주세요")
+                        let studentName = readStudentName()
+                        studentManager.getAverageGrade(studentName)
+                    case .exit:
+                        print("프로그램을 종료합니다...")
+                        break
+                    }
                 }
+            } catch {
+                print("error = \(error)")
+                break
             }
         }
     }
     
-    private func validateInput(_ input: String) -> Bool {
-        return input.range(of: "[^0-9a-zA-Z]", options: .regularExpression) == nil && !input.isEmpty
-    }
-}
-
-final class StudentManager {
-    var studentList: [Student] = []
-    
-    /// Input Error 커스텀
-    /// StudentManager 내부에서만 사용하므로 private
-    private enum InputError: Error {
-        case invalidStudentName
-        case invalidInfos(String)
-    }
-    
-    // MARK: 학생 추가
-    public func addStudent() {
-        print("추가할 학생의 이름을 입력해주세요")
-        let studentName = readStudentName()
-        addStudentName(studentName)
-    }
-    
-    // MARK: 학생 삭제
-    public func removeStudent() {
-        print("삭제할 학생의 이름을 입력해주세요")
-        let studentName = readStudentName()
-        removeStudentWhenAdded(studentName)
-    }
-    
-    // MARK: 성적 추가
-    public func addGrade() {
-        print("성적을 추가할 학생의 이름, 과목 이름, 성적(A+, A, F 등)을 띄어쓰기로 구분하여 차례로 작성해주세요.")
-        guard let studentInfos = readStudentInfos(3) else { return }
-        setGrade(studentInfos)
-    }
-    
-    // MARK: 성적 삭제
-    public func removeGrade() {
-        print("성적을 삭제할 학생의 이름, 과목 이름을 띄어쓰기로 구분하여 차례로 작성해주세요.")
-        guard let subject = readStudentInfos(2) else { return }
-        removeGrade(subject)
-    }
-    
-    // MARK: 평점 보기
-    public func getAverageGrade() {
-        print("평점을 알고싶은 학생의 이름을 입력해주세요")
-        let studentName = readStudentName()
-        startCheckAverage(studentName)
+    /// 학생의 이름 입력
+    private func readStudentName() -> String {
+        let input = readLine() ?? ""
+        do {
+            if try validateInput(input) {
+                return input
+            }
+        } catch {
+            print("입력이 잘못되었습니다. 다시 확인해주세요.")
+            MyCreditManager().start()
+        }
+        return input
     }
     
     /// 성적 추가 할 경우 Input 정합성 체크
@@ -99,15 +78,66 @@ final class StudentManager {
     ///   - count: 입력 개수
     /// - Returns:
     ///   - Student: 성적이 입력된 Student 객체
-    private func readStudentInfos(_ count: Int) -> Student? {
+    private func readStudentInfos(_ count: Int) -> [String] {
         let input = readLine() ?? ""
         let infos = input.components(separatedBy: " ") // [String]
-        do {
-            return try validateInfos(infos, count)
-        } catch {
-            print("\(error)")
+        return infos
+    }
+    
+    private func validateInput(_ input: String) throws -> Bool {
+        guard input.range(of: "[^0-9a-zA-Z]", options: .regularExpression) == nil && !input.isEmpty else {
+            throw InputError.invalidStudentName
         }
-        return nil
+        return true
+    }
+}
+
+/// Input Error 커스텀
+public enum InputError: Error {
+    case invalidStudentName
+    case invalidInfos(String)
+}
+
+final class StudentManager {
+    var studentList: [Student] = []
+    
+    // MARK: 학생 추가
+    public func addStudent(_ studentName: String) {
+        addStudentName(studentName)
+    }
+    
+    // MARK: 학생 삭제
+    public func removeStudent(_ studentName: String) {
+        removeStudentWhenAdded(studentName)
+    }
+    
+    // MARK: 성적 추가
+    public func addGrade(_ studentInfos: [String]) {
+        var studentInfo: Student?
+        do {
+            studentInfo = try validateInfos(studentInfos, 3)
+        } catch {
+            print(error)
+        }
+        guard let unwrappedStudent = studentInfo else { return }
+        setGrade(unwrappedStudent)
+    }
+    
+    // MARK: 성적 삭제
+    public func removeGrade(_ studentInfos: [String]) {
+        var studentInfo: Student!
+        do {
+            studentInfo = try validateInfos(studentInfos, 2)
+        } catch {
+            print(error)
+        }
+        guard let unwrappedStudent = studentInfo else { return }
+        removeGrade(unwrappedStudent)
+    }
+    
+    // MARK: 평점 보기
+    public func getAverageGrade(_ studentName: String) {
+        startCheckAverage(studentName)
     }
     
     /// 성적 추가 / 성적 삭제 시 입력받은 문자열 체크
@@ -135,18 +165,6 @@ final class StudentManager {
             return Student(name: infos[0], grade: [Grade(subject: infos[1], rating: Rating(rawValue: infos[2]))])
         }
         return Student(name: infos[0], grade: [Grade(subject: infos[1], rating: nil)])
-    }
-    
-    /// 학생의 이름 입력
-    private func readStudentName() -> String {
-        let input = readLine() ?? ""
-        do {
-            try validateStudentName(input)
-        } catch {
-            print("입력이 잘못되었습니다. 다시 확인해주세요.")
-            manager.start()
-        }
-        return input
     }
     
     /// 학생의 이름을 입력받을 때 정합성 체크
